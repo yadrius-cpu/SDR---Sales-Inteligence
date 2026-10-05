@@ -1,92 +1,239 @@
-# PhishShield Sales Intelligence
+# SDR Sales Intelligence
 
-Aplicação interna em português, independente do banco e do produto PhishShield.
+Plataforma web de CRM e inteligência comercial para equipes de vendas B2B. O sistema centraliza empresas, contatos, campanhas, oportunidades, tarefas, pesquisas, conversas e abordagens comerciais em um único ambiente.
 
-## Estado atual — 30/09/2026
+A aplicação ajuda a equipe a descobrir e organizar empresas-alvo, registrar evidências, identificar oportunidades, acompanhar o pipeline, analisar conversas e criar mensagens personalizadas com apoio de IA. Toda abordagem passa por revisão humana antes de ser utilizada.
 
-O MVP está pronto para demonstração e piloto controlado. A verificação local mais recente aprovou o typecheck, o build de produção e **39/39 testes unitários**. Isso valida o código e os fluxos exercitados, mas não significa que a infraestrutura de produção esteja configurada.
+O sistema foi desenvolvido para funcionar inicialmente em ambiente local e piloto controlado, com PostgreSQL, Next.js, React, TypeScript e Drizzle ORM.
 
-Antes de publicar para usuários reais, ainda é necessário configurar HTTPS/reverse proxy, domínio e `APP_ORIGIN`, contas reais, credencial de runtime do banco separada da credencial de migração, backups criptografados com teste de restauração, recuperação de conta e políticas de retenção/exportação/exclusão. O pentest de infraestrutura pública e o teste de carga também permanecem pendentes.
+## A jornada
 
-O Docker Desktop não estava disponível na última verificação desta máquina; portanto, o estado do PostgreSQL local não foi considerado evidência de ambiente operacional. Para iniciar o ambiente local, siga as instruções abaixo.
+| Etapa | Onde | O que acontece |
+|---|---|---|
+| 1. Usuários e acesso | Login e administração | Cada usuário acessa o sistema com sua própria conta, sessão protegida e papel definido: proprietário, operador ou visualizador. |
+| 2. Produtos e campanhas | Catálogo e campanhas | O administrador cadastra produtos, diferenciais, claims permitidos, claims proibidos, setores, regiões e cargos-alvo. |
+| 3. Empresas | CRM | A equipe cadastra ou importa empresas por CSV, identifica duplicidades, define responsáveis e associa empresas a campanhas. |
+| 4. Pesquisa comercial | Pesquisa | São registrados fatos públicos, fontes, URLs, evidências e hipóteses sobre cada empresa. Todo conteúdo precisa ser revisado antes de ser tratado como evidência aprovada. |
+| 5. Contatos e oportunidades | CRM e pipeline | A equipe registra contatos, cargos, canais, oportunidades, etapas do funil, próximos passos e responsáveis. |
+| 6. Abordagens | Outreach | O sistema cria rascunhos de mensagens com contexto comercial, produto, empresa e objetivo da abordagem. O texto precisa ser revisado e aprovado antes do uso. |
+| 7. Conversas | Conversas e insights | Conversas podem ser registradas, corrigidas e analisadas. A IA pode sugerir dores, objeções, pedidos, intenções e próximos passos, sempre aguardando revisão humana. |
+| 8. Analytics | Insights e experimentos | Os resultados podem ser analisados por campanha, setor, coorte e etapa do funil, além de permitir experimentos A/B com protocolo definido. |
 
-## Entrega atual
+## Arquitetura
 
-**Segurança — 27/09/2026:** avaliação em laboratório isolado, correções de leitura HTTP/cota de IA/validação, CSP com nonce, cabeçalhos e limite global de login. Relatório, evidências e riscos ainda abertos em [avaliação de segurança](docs/PENTEST_2026-09-27.md). Isso não substitui a preparação da infraestrutura para produção.
+\`\`\`text
+┌──────────────────────────────────────────────────────────────┐
+│ Usuário                                                       │
+│ Login, CRM, pesquisa, pipeline, conversas e abordagens       │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ HTTPS
+┌──────────────────────────────▼───────────────────────────────┐
+│ Next.js 16 + React + TypeScript                              │
+│ Interface, autenticação, rotas da aplicação e API            │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ Drizzle ORM
+┌──────────────────────────────▼───────────────────────────────┐
+│ PostgreSQL 17                                                │
+│ Usuários, empresas, contatos, campanhas, evidências,         │
+│ oportunidades, tarefas, conversas, auditoria e analytics     │
+└──────────────────────────────────────────────────────────────┘
 
-**Atualização — etapa 5:** insights por campanha, setor e coorte de criação, funil de marcos registrados, dores/objeções/pedidos revisados, motivos de perda e experimentos A/B com protocolo fixo, sorteio, janela de observação e intervalos de incerteza. Abra **Insights e experimentos** no menu. Migração aditiva e instruções em [etapa 5](docs/ETAPA_5.md). Verificação: `npm run test:analytics`.
+Integrações opcionais:
+- API Anthropic para geração de textos comerciais
+- API OpenAI para análise de conversas
+- Wikidata para pesquisa pública controlada
+\`\`\`
 
-**Atualização v0.4.2:** etapa 1 entregue: importação CSV com mapeamento/prévia/decisões por linha, CNPJ numérico e alfanumérico, busca/filtros/paginação, edição de cadastros, vínculo empresa/campanha, responsáveis e pipeline completo com histórico. Abra **Empresas → Importar empresas por CSV** ou **Pipeline**. Instruções em [etapa 1](docs/ETAPA_1.md).
+## Funcionalidades principais
 
-**Atualização v0.4.1:** redação com Claude como primeira opção e GPT como alternativa, com escolha de tom, contexto revisado e exemplo de estilo. Abra a revisão de um rascunho → **Redigir com IA**. Ambos ficam desativados até configuração local; consulte [Redação com IA](docs/REDACAO_IA.md). A análise de conversas continua com OpenAI.
+- Cadastro e gestão de empresas, contatos e responsáveis.
+- Importação de empresas por CSV com prévia e tratamento de duplicidades.
+- Campanhas com critérios de inclusão e exclusão.
+- Pipeline comercial com histórico de alterações.
+- Cadastro de produtos e catálogo versionado.
+- Pesquisa com fontes, evidências e fundamento de permissão.
+- Registro e revisão de hipóteses comerciais.
+- Criação e revisão de rascunhos de abordagem.
+- Geração de textos com Claude ou OpenAI.
+- Registro de conversas e atividades.
+- Extração de insights de conversas.
+- Registro de opt-out e bloqueio de contato.
+- Tarefas e próximos passos.
+- Auditoria transacional das ações.
+- Analytics por campanha, setor e coorte.
+- Experimentos A/B comerciais.
+- Controle de acesso por usuário, organização e produto.
 
-**Atualização v0.4:** memória de conversa, insights com trechos, revisão, correção de hipóteses e próximos passos explicados. Abra uma oportunidade → **Conversas e próximos passos**. Integração OpenAI preparada, desativada até configurar chave/modelo/preços e política em `.env`; instruções em [etapa 4](docs/ETAPA_4.md). As etapas de [abordagem](docs/ETAPA_3.md) e [pesquisa](docs/ETAPA_2.md) continuam disponíveis.
+## O que o sistema não faz atualmente
 
-Fundação executável (estágio 0) e fluxos dos estágios 1–5 implementados para piloto local. Next.js 16.3.6, React, TypeScript, PostgreSQL 17 e Drizzle 0.45.3, com versões resolvidas em `package-lock.json`. Login por senha com scrypt, sessão opaca persistida como hash, expiração de 8 horas, cookies HttpOnly/SameSite, verificação de origem em mutações, limite persistente de tentativas por conta e autorização no servidor.
+- Não envia mensagens automaticamente pelo LinkedIn.
+- Não automatiza navegador ou sessão do LinkedIn.
+- Não possui integração de envio pelo WhatsApp.
+- Não dispara campanhas em massa.
+- Não substitui a revisão humana das mensagens.
+- Não está pronto para uso com dados pessoais reais sem configuração adicional de produção.
 
-Telas: login, visão geral com contagens reais, empresas, campanhas, pesquisa/revisão, contatos, oportunidades, abordagens, tarefas e administração com catálogo versionado. Cadastros e mutações comerciais têm auditoria transacional. Domínio repetido retorna conflito e exige confirmação explícita de empresa distinta; não há fusão automática. Owner acessa admin, operator cadastra e revisa, viewer consulta. O banco contém apenas demonstração fictícia inicialmente.
+A execução de contatos ainda é manual: o sistema prepara, organiza e revisa as informações e mensagens, mas o operador decide quando e por qual canal realizar o contato.
 
-## Executar no Windows / PowerShell
+## Segurança e governança
 
-Pré-requisitos: Node.js 22.14 ou superior compatível e Docker Desktop em execução.
+| Camada | Proteção |
+|---|---|
+| Senhas | Armazenadas com derivação baseada em scrypt. |
+| Sessões | Token opaco armazenado como hash, com expiração e cookie HttpOnly. |
+| Autorização | Permissões verificadas no servidor conforme o papel do usuário. |
+| Requisições | Validação de origem, limite de tamanho e validação de JSON. |
+| Login | Limites por conta e limite global contra tentativas abusivas. |
+| Dados de IA | Uso condicionado à configuração, política aprovada e autorização explícita. |
+| Evidências | Fatos, hipóteses e declarações de clientes possuem tipos e status de revisão diferentes. |
+| Conversas | Conteúdo pode ser corrigido, apagado e reprocessado sem perder o histórico de auditoria. |
+| Abordagens | Alterações em contatos ou contexto invalidam rascunhos aprovados. |
+| Opt-out | Contatos que pedem para não ser abordados ficam bloqueados para novos fluxos. |
+| Auditoria | Ações comerciais e administrativas são registradas com usuário, entidade e metadados. |
+| Banco | Migrações versionadas e separadas do código da aplicação. |
 
-```powershell
+## Riscos e limitações atuais
+
+Antes de utilizar o sistema com dados reais, ainda é necessário configurar:
+
+- HTTPS e reverse proxy.
+- Domínio e \`APP_ORIGIN\`.
+- Contas reais de usuários.
+- Credencial de runtime separada da credencial de migração do banco.
+- Backups criptografados e teste de restauração.
+- Política de retenção, exportação e exclusão.
+- Recuperação de senha e limpeza de sessões antigas.
+- Política de privacidade e base legal para dados pessoais.
+- Pentest da infraestrutura pública.
+- Teste de carga.
+
+As integrações com Claude, OpenAI e Wikidata estão preparadas, mas devem ser configuradas e avaliadas antes do uso em produção.
+
+## Executar localmente
+
+Pré-requisitos:
+
+- Node.js 22.14 ou superior.
+- Docker Desktop.
+- npm.
+
+No PowerShell:
+
+\`\`\`powershell
 npm ci
 Copy-Item .env.example .env
-# Edite .env e defina SEED_PASSWORD com ao menos 12 caracteres.
+\`\`\`
+
+Edite o arquivo \`.env\` e defina uma senha para \`SEED_PASSWORD\`. Depois execute:
+
+\`\`\`powershell
 docker compose up -d --wait
 npm run db:migrate
 npm run db:seed
 npm run dev
-```
+\`\`\`
 
-Abra http://127.0.0.1:3000. Contas: `owner@demo.invalid`, `operator@demo.invalid`, `viewer@demo.invalid`; senha configurada em `SEED_PASSWORD`. O seed não altera senhas de usuários existentes. Na instalação criada nesta sessão, `.env` já contém uma senha aleatória local; consulte esse arquivo sem compartilhá-lo. Não sobrescreva `.env` ao retomar esta instalação.
+Abra \`http://127.0.0.1:3000\`.
 
-Variáveis: `DATABASE_URL` conecta ao banco comercial; `POSTGRES_PASSWORD` configura o container; `APP_ORIGIN` deve coincidir exatamente com a origem usada no navegador; `SEED_PASSWORD` cria exclusivamente as contas fictícias. `.env` está ignorado no Git. Nenhuma chave de LLM é necessária.
+As contas de demonstração são:
 
-O PostgreSQL fica restrito a `127.0.0.1:5440`, evitando conflito com a porta padrão. `docker compose stop` para o banco preservando os dados. O servidor usa apenas loopback. Build: `npm run build`. Para produção, configurar HTTPS/reverse proxy, origem, contas reais e operação antes de usar `npm start`; cookies de produção exigem HTTPS.
+\`\`\`text
+owner@demo.invalid
+operator@demo.invalid
+viewer@demo.invalid
+\`\`\`
 
-## Verificar
+A senha é a definida na variável \`SEED_PASSWORD\`. O banco PostgreSQL local utiliza a porta \`5440\`.
 
-```powershell
+## Configuração de IA
+
+As integrações de IA ficam desativadas por padrão.
+
+Para geração de mensagens, configure:
+
+\`\`\`text
+ANTHROPIC_API_KEY
+CLAUDE_WRITING_MODEL
+OPENAI_API_KEY
+OPENAI_WRITING_MODEL
+\`\`\`
+
+Para análise de conversas:
+
+\`\`\`text
+OPENAI_API_KEY
+OPENAI_MODEL
+\`\`\`
+
+A aplicação exige configuração válida, autorização explícita e revisão humana antes de considerar qualquer resultado de IA como aprovado.
+
+## Verificação
+
+\`\`\`powershell
 npm run typecheck
 npm test
 npm run build
-# Com npm run dev aberto em outro terminal:
-npx tsx scripts/smoke.ts
+\`\`\`
+
+Testes específicos:
+
+\`\`\`powershell
 npm run test:research
 npm run test:outreach
-# Requer Edge instalado; usa perfil temporário e apenas a aplicação local:
-npm run test:browser
 npm run test:conversations
-npm run test:conversation-browser
 npm run test:writing
 npm run test:crm
+npm run test:analytics
+\`\`\`
+
+Os testes de navegador exigem o Microsoft Edge instalado:
+
+\`\`\`powershell
+npm run test:browser
+npm run test:conversation-browser
 npm run test:crm-browser
-```
+\`\`\`
 
-O smoke usa as contas fictícias, cria dados próprios, verifica as permissões no endpoint e remove os cadastros que criou. Não executar contra produção. Para alterar o schema: `npm run db:generate`, revisar o SQL em `drizzle/` e `npm run db:migrate`. As migrações são versionadas; não use schema push em produção.
+## Banco de dados
 
-Resultados v0.4.2: **39 testes unitários**, integração de CRM com importação de 20 linhas e paginação acima de 50 cadastros, regressões de fundação/abordagem/conversa/redação, TypeScript e build aprovados. Edge verificou prévia/decisões/importação, busca, edição, pipeline, histórico e layout móvel. Capturas e limites em [etapa 1](docs/ETAPA_1.md).
+Para gerar uma nova migração:
 
-Resultados v0.4.1: 25 testes unitários aprovados; TypeScript e build aprovados; migração de redação aplicada. Integração com PostgreSQL validou Claude/GPT simulados, orçamento, replay, concorrência, preservação do texto em falhas e descarte após opt-out. Regressões HTTP de abordagem/conversa aprovadas. Edge validou seleção de provedor, contexto obrigatório para respostas, bloqueio sem autorização/origem, layout móvel e fluxo manual anterior. Capturas: `test-results/redacao-ia-desktop.png` e `test-results/redacao-ia-mobile.png`. Nenhuma chamada real aos provedores de IA; qualidade de redação e compatibilidade com o modelo escolhido ainda exigem avaliação após configuração local.
+\`\`\`powershell
+npm run db:generate
+\`\`\`
 
-Resultados v0.4: TypeScript e build aprovados; 21 testes unitários aprovados; migrações reproduzíveis; smoke HTTP de fundação, pesquisa, abordagem e conversa aprovados com PostgreSQL real. Edge validou cópia real sem envio, confirmação manual, opt-out e o fluxo de registro/extração/revisão de conversa com hipótese corrigida, também em tela móvel. Capturas em `test-results/`. Testes de concorrência confirmam ausência de duplicação de envio/tarefa. Wikidata e OpenAI foram testados com respostas controladas, sem consulta externa real; orçamento insuficiente e erros do provedor foram exercitados. Restauração de backup ainda não foi testada.
+Para aplicar as migrações:
 
-Auditoria npm: nenhuma vulnerabilidade em dependências de produção; 4 avisos moderados na cadeia de desenvolvimento `drizzle-kit → @esbuild-kit → esbuild`, relacionados ao servidor de desenvolvimento do esbuild. Esse servidor não é utilizado aqui. Atualização da cadeia pendente; não aplicado o downgrade incompatível sugerido por `npm audit fix --force`.
+\`\`\`powershell
+npm run db:migrate
+\`\`\`
 
-## API disponível
+As migrações ficam versionadas na pasta \`drizzle/\`. Não utilize atualização automática do schema em produção sem revisar a migração gerada.
 
-`/api/v1/auth/login`, `/auth/logout`, `/me`, `GET/POST /companies`, `GET/POST /campaigns`, `GET /products`, `GET /admin/users`, `GET /admin/audit`, todos sob `/api/v1`. Consultas de empresas/campanhas têm `page` e 50 itens por página. Escrita requer JSON, sessão e header Origin compatível. Erros têm formato `{error:{code,message}}`. Empresas têm busca, filtros e paginação visual de 50 resultados; detalhes e rotas adicionais em [etapa 1](docs/ETAPA_1.md).
+## Status atual
 
-Contratos adicionais de pesquisa estão em [etapa 2](docs/ETAPA_2.md); contatos, oportunidades, drafts, opt-out, tarefas e catálogo em [etapa 3](docs/ETAPA_3.md); conversas, insights, correção de hipóteses e configuração OpenAI em [etapa 4](docs/ETAPA_4.md); redação Claude/GPT em [Redação com IA](docs/REDACAO_IA.md).
+O projeto está em estágio de MVP para demonstração e piloto controlado.
 
-## Limites e próximos passos
+Já estão implementados:
 
-Estágio 1 entregue conforme [etapa 1](docs/ETAPA_1.md). CNPJ tem validação local de formato/DV, sem consulta cadastral. Importações são limitadas a 200 linhas por lote; sem fusão automática. Exclusão/exportação integral e retenção permanecem no escopo administrativo de preparação para produção.
+- CRM de empresas e contatos.
+- Campanhas e pipeline.
+- Importação CSV.
+- Pesquisa e evidências.
+- Abordagens comerciais.
+- Conversas e insights.
+- Redação assistida por IA.
+- Analytics e experimentos.
+- Auditoria e controle de permissões.
+- Testes automatizados e migrações versionadas.
 
-Estágios 2–5 disponíveis conforme seus documentos. Etapa 6 pendente: integrações opcionais. Agregações e experimentos da etapa 5 estão implementados para piloto local, com limites descritos em [etapa 5](docs/ETAPA_5.md). Não há envio automático de mensagens. LinkedIn é utilizado manualmente; Wikidata permanece desabilitado. Adaptadores OpenAI/Claude foram implementados e testados com respostas controladas, mas estão desativados e não foram validados com chaves reais.
+A próxima etapa principal é preparar a infraestrutura de produção e, posteriormente, avaliar integrações controladas com canais externos de prospecção.
 
-Antes de dados pessoais reais: implementar exportação/exclusão, retenção, gestão de usuários, recuperação de senha, limpeza de sessões antigas, políticas de privacidade, backup criptografado e restauração; separar a credencial de runtime do superusuário do banco. Login agora tem limite global de 60 requisições/minuto, além de 10 tentativas/conta em 15 minutos, e limpeza de tentativas com mais de 24 horas. Esses limites não substituem proteção na borda e ainda permitem bloqueio temporário de uma conta por terceiro. Auditoria guarda IDs e metadados mínimos, sem senhas ou corpos das conversas. Campanhas não devem operar em escala nesta versão.
+## Documentação
 
-Veja [validação do blueprint](docs/VALIDACAO_BLUEPRINT.md) e [matriz de capacidades](docs/CAPACIDADES_PHISHSHIELD.md).
+- [Blueprint do projeto](PhishShield_Sales_Intelligence_Blueprint.md)
+- [Arquitetura, produtos e acessos](docs/ARQUITETURA_PRODUTOS_E_ACESSOS.md)
+- [Capacidades do produto](docs/CAPACIDADES_PHISHSHIELD.md)
+- [Redação com IA](docs/REDACAO_IA.md)
+- [Validação do blueprint](docs/VALIDACAO_BLUEPRINT.md)
+
