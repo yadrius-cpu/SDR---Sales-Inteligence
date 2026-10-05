@@ -1,0 +1,47 @@
+import "dotenv/config";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { chromium,type Browser } from "playwright";
+import { eq,or,sql } from "drizzle-orm";
+import { db,pool } from "../src/db";
+import { auditEvents,companies,contacts,opportunities,outreachDrafts,tasks } from "../src/db/schema";
+const origin=process.env.APP_ORIGIN!;let browser:Browser|undefined,companyId="",opportunityId="";
+async function main(){
+  if(process.env.NODE_ENV==="production"||!["127.0.0.1","localhost"].includes(new URL(origin).hostname))throw new Error("Teste somente em servidor local de desenvolvimento.");
+  browser=await chromium.launch({channel:process.env.TEST_BROWSER_CHANNEL??"msedge",headless:true});
+  const context=await browser.newContext({viewport:{width:1365,height:950}});await context.grantPermissions(["clipboard-read","clipboard-write"],{origin});
+  const externalRequests:string[]=[];await context.route("**/*",route=>{const url=new URL(route.request().url());if(url.origin!==origin){externalRequests.push(url.hostname);return route.abort();}return route.continue();});
+  const page=await context.newPage();const pageErrors:string[]=[];page.on("pageerror",error=>pageErrors.push(error.message));
+  await page.goto(`${origin}/login`);await page.getByLabel("E-mail profissional").fill("operator@demo.invalid");await page.getByLabel("Senha",{exact:true}).fill(process.env.SEED_PASSWORD!);await page.getByRole("button",{name:"Entrar",exact:true}).click();await page.waitForURL(origin+"/");
+  async function post(path:string,data:unknown){const response=await context.request.post(`${origin}/api/v1/${path}`,{headers:{origin},data});assert.ok(response.ok(),`${path}: ${response.status()}`);return (await response.json()).data;}
+  const company=await post("companies",{displayName:"Contabilidade Aurora — teste de navegador fictício",sector:"Contabilidade"});companyId=company.id;
+  const contact=await post(`companies/${companyId}/contacts`,{name:"Marina Fictícia",title:"Sócia",roleCategory:"owner",sourceUrl:"https://example.invalid/teste",permittedBasis:"Registro inteiramente fictício para teste",purpose:"Teste local da revisão e cópia de abordagem"});
+  const campaignResponse=await context.request.get(`${origin}/api/v1/campaigns`);const campaign=(await campaignResponse.json()).data[0];assert.ok(campaign);
+  const opportunity=await post("opportunities",{companyId,campaignId:campaign.id,primaryContactId:contact.id});opportunityId=opportunity.id;
+  await page.goto(`${origin}/opportunities/${opportunityId}`);const generated=page.waitForResponse(r=>r.url().endsWith(`/opportunities/${opportunityId}/drafts`)&&r.request().method()==="POST");await page.getByRole("button",{name:"Gerar rascunho para revisão"}).click();const draft=(await (await generated).json()).data;
+  await page.goto(`${origin}/drafts/${draft.id}`);
+  await page.getByRole("heading",{name:"Redigir com IA",exact:true}).waitFor();
+  assert.equal(await page.getByLabel("Provedor de redação").inputValue(),process.env.WRITING_DEFAULT_PROVIDER??"claude");
+  await page.getByLabel("Provedor de redação").selectOption("openai");
+  await page.getByLabel("Tipo de mensagem").selectOption("reply");
+  assert.equal(await page.getByLabel(/Contexto revisado da conversa/).getAttribute("required"),"");
+  await page.getByLabel("Provedor de redação").selectOption("claude");
+  await page.getByLabel("Tipo de mensagem").selectOption("initial");
+  const noAuthorization=await context.request.post(`${origin}/api/v1/drafts/${draft.id}/generate-text`,{headers:{origin},data:{version:1,provider:"claude",requestKey:randomUUID()}});assert.equal(noAuthorization.status(),400);
+  const wrongOrigin=await context.request.post(`${origin}/api/v1/drafts/${draft.id}/generate-text`,{headers:{origin:"https://example.invalid"},data:{}});assert.equal(wrongOrigin.status(),403);
+  await mkdir("test-results",{recursive:true});await page.screenshot({path:"test-results/redacao-ia-desktop.png",fullPage:true});
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);await page.screenshot({path:"test-results/redacao-ia-mobile.png",fullPage:true});await page.setViewportSize({width:1365,height:950});
+  await page.getByLabel(/Conferi destinatário/).check();await page.getByRole("button",{name:"Aprovar texto",exact:true}).click();await page.getByRole("button",{name:"Copiar texto aprovado"}).waitFor();
+  await mkdir("test-results",{recursive:true});await page.screenshot({path:"test-results/etapa-3-aprovacao-desktop.png"});
+  const copied=page.waitForResponse(r=>r.url().endsWith(`/drafts/${draft.id}/copied`));await page.getByRole("button",{name:"Copiar texto aprovado"}).click();assert.equal((await copied).status(),200);assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,"\n"),draft.message);
+  let [stored]=await db.select().from(outreachDrafts).where(eq(outreachDrafts.id,draft.id));assert.ok(stored.copiedAt);assert.equal(stored.sentConfirmedAt,null);assert.equal((await db.select().from(tasks).where(eq(tasks.opportunityId,opportunityId))).length,0);
+  await page.getByLabel(/Confirmo que enviei este texto/).check();const sent=page.waitForResponse(r=>r.url().endsWith(`/drafts/${draft.id}/confirm-sent`));await page.getByRole("button",{name:"Confirmar que enviei manualmente"}).click();assert.equal((await sent).status(),200);await page.getByRole("heading",{name:"Envio manual confirmado",exact:true}).waitFor();
+  [stored]=await db.select().from(outreachDrafts).where(eq(outreachDrafts.id,draft.id));assert.ok(stored.sentConfirmedAt);assert.equal((await db.select().from(tasks).where(eq(tasks.opportunityId,opportunityId))).length,1);
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);await page.screenshot({path:"test-results/etapa-3-envio-mobile.png"});
+  await page.goto(`${origin}/companies/${companyId}/outreach`);await page.getByText("Registrar pedido de não contato",{exact:true}).click();await page.getByLabel(/Confirmo o pedido de não contato/).check();const optOut=page.waitForResponse(r=>r.url().endsWith(`/contacts/${contact.id}/opt-out`));await page.getByRole("button",{name:"Registrar opt-out",exact:true}).click();assert.equal((await optOut).status(),200);await page.getByText("Opt-out: não contatar",{exact:true}).waitFor();
+  await page.goto(`${origin}/drafts/${draft.id}`);assert.equal(await page.getByRole("button",{name:"Copiar texto aprovado"}).count(),0);assert.equal((await db.select().from(tasks).where(eq(tasks.opportunityId,opportunityId)))[0].status,"cancelled");
+  assert.deepEqual(externalRequests,[]);assert.deepEqual(pageErrors,[]);
+  await post("auth/logout",{});console.log("Navegador Edge aprovado: login, geração, aprovação, área de transferência real, copiar sem enviar, confirmação manual, tarefa, opt-out e layout móvel. Nenhuma requisição externa da página. Capturas em test-results/.");
+}
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();if(companyId){await db.delete(auditEvents).where(or(eq(auditEvents.entityId,companyId),sql`${auditEvents.metadata}->>'companyId' = ${companyId}`));await db.delete(opportunities).where(eq(opportunities.companyId,companyId));await db.delete(contacts).where(eq(contacts.companyId,companyId));await db.delete(companies).where(eq(companies.id,companyId));}await pool.end();});

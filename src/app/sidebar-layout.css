@@ -1,0 +1,7 @@
+.shell:has(.workspace-nav.is-collapsed){grid-template-columns:72px minmax(0,1fr)}
+.shell:has(.workspace-nav.is-collapsed) aside{padding-left:10px;padding-right:10px}
+.shell:has(.workspace-nav.is-collapsed) .brand{padding:0;text-align:center}
+.shell:has(.workspace-nav.is-collapsed) .brand-name,.shell:has(.workspace-nav.is-collapsed) .brand>span:last-child{display:none}
+.shell:has(.workspace-nav.is-collapsed) footer{justify-content:center;padding-left:0;padding-right:0}
+.shell:has(.workspace-nav.is-collapsed) footer form{display:none}
+@media(max-width:800px){.shell:has(.workspace-nav.is-collapsed){display:block}.shell:has(.workspace-nav.is-collapsed) aside{padding-left:16px;padding-right:16px}}

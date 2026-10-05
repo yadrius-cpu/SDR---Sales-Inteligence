@@ -1,0 +1,13 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { count,desc,eq } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db";
+import { activities,opportunities,users } from "@/db/schema";
+import { requireUser } from "@/lib/auth";
+import { stageLabels } from "@/lib/outreach/contracts";
+export default async function History({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{page?:string}>}){await requireUser();const {id}=await params;if(!z.uuid().safeParse(id).success)notFound();if(!await db.query.opportunities.findFirst({where:eq(opportunities.id,id)}))notFound();const parsed=z.coerce.number().int().min(1).max(10000).safeParse((await searchParams).page??1),page=parsed.success?parsed.data:1;
+  const [rows,totals,people]=await Promise.all([db.select({event:activities,actor:users.name}).from(activities).innerJoin(users,eq(activities.authorId,users.id)).where(eq(activities.opportunityId,id)).orderBy(desc(activities.happenedAt),desc(activities.id)).limit(50).offset((page-1)*50),db.select({total:count()}).from(activities).where(eq(activities.opportunityId,id)),db.select({id:users.id,name:users.name}).from(users)]);
+  const labels:Record<string,string>={stage_changed:"Mudança de estágio",owner_changed:"Mudança de responsável",manual_sent_confirmed:"Envio manual confirmado",inbound_message:"Mensagem recebida",outbound_note:"Nota de mensagem enviada",conversation_note:"Nota da conversa",opt_out:"Pedido de não contato"};
+  return <><Link href={`/opportunities/${id}`}>← Oportunidade</Link><h1>Histórico da oportunidade</h1><p>{totals[0].total} eventos · página {page}</p><section className="panel">{rows.map(({event:e,actor})=><article className="evidence-card" key={e.id}><h2>{labels[e.kind]??e.kind}</h2><p>{e.happenedAt.toLocaleString("pt-BR",{timeZone:"UTC"})} UTC · {actor}</p>{e.kind==="stage_changed"&&<p>{stageLabels[String(e.metadata.from)]??String(e.metadata.from??"")} → {stageLabels[String(e.metadata.to)]??String(e.metadata.to??"")}</p>}{e.kind==="owner_changed"&&<p>{people.find(p=>p.id===e.metadata.from)?.name??"Responsável anterior"} → {people.find(p=>p.id===e.metadata.to)?.name??"Responsável atual"}</p>}{typeof e.metadata.reason==="string"&&<p>Motivo: {e.metadata.reason}</p>}{e.deletedAt&&<p>Conteúdo apagado.</p>}{e.kind.includes("message")||e.kind.includes("note")?<Link href={`/opportunities/${id}/conversation#activity-${e.id}`}>Ver registro da conversa →</Link>:null}</article>)}{!rows.length&&<p>Nenhum evento nesta página.</p>}</section><nav className="actions">{page>1&&<Link href={`?page=${page-1}`}>← Anterior</Link>}{page*50<totals[0].total&&<Link href={`?page=${page+1}`}>Próxima →</Link>}</nav></>;
+}

@@ -1,0 +1,22 @@
+import Link from "next/link";
+import { and, desc, eq } from "drizzle-orm";
+import { ApiForm } from "@/components/forms";
+import { db } from "@/db";
+import { customerDrafts, customerLeads } from "@/db/schema";
+import { requireUser } from "@/lib/auth";
+
+const labels:Record<string,string> = {new:"Novo",qualified:"Qualificado",contacted:"Contatado",meeting:"Reunião",won:"Ganho",lost:"Perdido"};
+
+export default async function EditCustomerLead({params}:{params:Promise<{id:string}>}) {
+  const user = await requireUser(), {id} = await params;
+  if (!user.customerOrganizationId) return <><h1>Lead indisponível</h1><Link href="/customer/leads">Voltar</Link></>;
+  const lead = await db.query.customerLeads.findFirst({where:(l,{and,eq})=>and(eq(l.id,id),eq(l.organizationId,user.customerOrganizationId!))});
+  if (!lead) return <><h1>Lead não encontrado</h1><Link href="/customer/leads">Voltar aos leads</Link></>;
+  const drafts = await db.select().from(customerDrafts).where(and(eq(customerDrafts.leadId,lead.id),eq(customerDrafts.organizationId,user.customerOrganizationId))).orderBy(desc(customerDrafts.createdAt));
+  const canWrite = user.customerRole !== "company_viewer";
+  return <><Link href="/customer/leads">← Leads e oportunidades</Link><p className="eyebrow">CRM DA EMPRESA</p><h1>Editar {lead.companyName}</h1>
+    <section className="panel"><ApiForm endpoint={"customer/leads/"+lead.id+"/edit"} label="Salvar alterações" redirectTo={"/customer/leads/"+lead.id+"/edit"}><div className="fields"><label>Empresa<input name="companyName" defaultValue={lead.companyName} required maxLength={160}/></label><label>Domínio<input name="domain" defaultValue={lead.domain ?? ""} maxLength={253}/></label><label>Nome do contato<input name="contactName" defaultValue={lead.contactName ?? ""} maxLength={120}/></label><label>Cargo<input name="contactTitle" defaultValue={lead.contactTitle ?? ""} maxLength={120}/></label><label>E-mail profissional<input name="contactEmail" defaultValue={lead.contactEmail ?? ""} type="email" maxLength={254}/></label><label>Status<select name="status" defaultValue={lead.status}>{Object.entries(labels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>Próxima ação<input name="nextAction" defaultValue={lead.nextAction ?? ""} maxLength={500}/></label><label>Notas<textarea name="notes" defaultValue={lead.notes ?? ""} rows={4} maxLength={3000}/></label></div></ApiForm></section>
+    <section className="panel"><p className="eyebrow">INTELIGÊNCIA ASSISTIDA</p><h2>{lead.fitScore === null ? "Lead ainda não analisado" : "Aderência estimada: "+lead.fitScore+"/100"}</h2><p>{lead.fitReason ?? "A análise usa o ICP e os dados preenchidos. O resultado é uma hipótese para revisão humana."}</p>{lead.personaHypothesis&&<p><strong>Persona provável:</strong> {lead.personaHypothesis}</p>}{lead.recommendedAction&&<p><strong>Próxima ação sugerida:</strong> {lead.recommendedAction}</p>}{canWrite&&<ApiForm endpoint={"customer/leads/"+lead.id+"/analyze"} label="Analisar lead" redirectTo={"/customer/leads/"+lead.id+"/edit"}><p>A análise não envia mensagens, não altera o estágio e não executa ações externas.</p></ApiForm>}</section>
+    <section className="panel"><p className="eyebrow">ABORDAGEM ASSISTIDA</p><h2>Mensagens revisáveis</h2><p>Gere uma pergunta inicial baseada no contexto do lead. A plataforma não envia a mensagem.</p>{canWrite&&<ApiForm endpoint={"customer/leads/"+lead.id+"/draft"} label="Gerar rascunho" redirectTo={"/customer/leads/"+lead.id+"/edit"}><input type="hidden" name="confirm" value="generate"/></ApiForm>} {drafts.map(draft=><article className="panel" key={draft.id}><span className="badge">{draft.status==="approved"?"Aprovado":draft.status==="rejected"?"Rejeitado":"Rascunho"}</span><p>{draft.message}</p><p><small>{draft.rationale}</small></p>{canWrite&&<><ApiForm endpoint={"customer/drafts/"+draft.id+"/edit"} label="Salvar mensagem editada" redirectTo={"/customer/leads/"+lead.id+"/edit"}><textarea name="message" defaultValue={draft.message} rows={5} minLength={20} maxLength={3000}/></ApiForm><ApiForm endpoint={"customer/drafts/"+draft.id+"/status"} label={draft.status==="approved"?"Manter aprovado":"Aprovar para copiar"} redirectTo={"/customer/leads/"+lead.id+"/edit"}><input type="hidden" name="status" value="approved"/><p>Depois de aprovar, copie e envie manualmente pelo seu canal.</p></ApiForm></>}</article>)}</section>
+  </>;
+}

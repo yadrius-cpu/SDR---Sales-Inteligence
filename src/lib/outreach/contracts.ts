@@ -1,0 +1,20 @@
+import { z } from "zod";
+import { publicUrl,ResearchError } from "../research/contracts";
+export const personaLabels={small_business:"Sócio / direção / administrativo",technical:"Responsável técnico"};
+export const stageLabels:Record<string,string>={discovered:"Descoberta",researched:"Pesquisada",qualified:"Qualificada",contact_identified:"Contato identificado",ready_for_review:"Abordagem em revisão",contacted:"Contato confirmado",replied:"Resposta recebida",discovery:"Discovery",meeting:"Reunião",trial:"Teste do produto",negotiation:"Negociação",won:"Ganha",lost:"Perdida",not_fit:"Fora do perfil",no_response:"Sem resposta",follow_up_later:"Acompanhar depois",do_not_contact:"Não contatar"};
+export function normalizeName(value:string){return value.normalize("NFKD").replace(/\p{Diacritic}/gu,"").toLowerCase().replace(/\s+/g," ").trim();}
+export function normalizeProfile(value:string){if(!value)return null;const u=new URL(value);u.search="";u.hash="";u.hostname=u.hostname.toLowerCase().replace(/^www\./,"");u.pathname=u.pathname.replace(/\/+$/,"")||"/";if(u.hostname==="linkedin.com"||u.hostname.endsWith(".linkedin.com")){u.hostname="linkedin.com";u.protocol="https:";u.pathname=u.pathname.toLowerCase();}return u.toString();}
+export const contactInput=z.object({name:z.string().trim().min(2).max(160),title:z.string().trim().min(2).max(160),roleCategory:z.enum(["owner","management","administration","technical","other"]),professionalUrl:z.union([z.literal(""),publicUrl]).default(""),workEmail:z.union([z.literal(""),z.email().max(254)]).default(""),sourceUrl:publicUrl,permittedBasis:z.string().trim().min(10).max(1000),purpose:z.string().trim().min(10).max(500)});
+export const draftInput=z.object({contactId:z.uuid(),persona:z.enum(["small_business","technical"]),evidenceId:z.union([z.literal(""),z.uuid()]).default(""),claimIndex:z.union([z.literal(""),z.coerce.number().int().min(0)]).default("")});
+export const versionInput=z.object({version:z.coerce.number().int().positive()});
+export const approveInput=versionInput.extend({attestation:z.literal("reviewed")});
+export const sentInput=versionInput.extend({confirmation:z.literal("sent_manually"),requestKey:z.uuid(),createFollowUp:z.enum(["true","false"]).default("true"),followUpDays:z.coerce.number().int().min(1).max(60).default(7)});
+export function assertReachable(contact:{doNotContactAt:Date|null},stage:string){if(contact.doNotContactAt||["do_not_contact","not_fit","lost","won"].includes(stage))throw new ResearchError("CONTACT_BLOCKED","Contato ou oportunidade bloqueados para abordagem.",409);}
+type Product={name:string;approvedClaims:string[];prohibitedClaims:string[]};
+export function composeDraft(input:{name:string;company:string;persona:keyof typeof personaLabels;product:Product;claimIndex:number|"";fact?:{claim:string}}){
+  if(input.claimIndex!==""&&!input.product.approvedClaims[input.claimIndex])throw new ResearchError("INVALID_CLAIM","Alegação não aprovada no catálogo.",400);
+  const capability=input.claimIndex===""?null:input.product.approvedClaims[input.claimIndex];
+  const context=input.fact?`Vi na fonte pública indicada: “${input.fact.claim}”. Gostaria de entender melhor o contexto da ${input.company}.`: `Estou conversando com empresas para entender como lidam com mensagens suspeitas no dia a dia.`;
+  const question=input.persona==="technical"?"Como vocês tratam relatos de mensagens suspeitas dos usuários e quais ferramentas participam desse processo?":"Como vocês avaliam mensagens suspeitas no dia a dia e quem costuma ajudar nessa decisão?";
+  return {message:[`Olá, ${input.name}.`,context,...(capability?[`Sobre o ${input.product.name}: ${capability}`]:[]),question,"Se fizer sentido para você, podemos conversar sobre esse processo."].join("\n\n"),isGeneric:!input.fact,rationale:input.fact?"Personalização limitada a um fato público revisado. A existência de dor não foi inferida.":"Abordagem genérica de discovery, sem evidência específica ou dor confirmada. Nome e empresa não constituem evidência de problema.",templateVersion:`discovery_${input.persona}_v1`};
+}

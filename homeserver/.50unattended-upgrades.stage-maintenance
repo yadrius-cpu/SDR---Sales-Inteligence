@@ -1,0 +1,8 @@
+// Security updates only. Existing configuration was backed up before replacement.
+Unattended-Upgrade::Allowed-Origins {
+        "${distro_id}:${distro_codename}-security";
+        "${distro_id}ESMApps:${distro_codename}-apps-security";
+        "${distro_id}ESM:${distro_codename}-infra-security";
+};
+
+Unattended-Upgrade::Automatic-Reboot "false";
