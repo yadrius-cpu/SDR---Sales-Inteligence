@@ -21,7 +21,7 @@ O sistema foi desenvolvido para funcionar inicialmente em ambiente local e pilot
 
 ## Arquitetura
 
-\`\`\`text
+```text
 ┌──────────────────────────────────────────────────────────────┐
 │ Usuário                                                       │
 │ Login, CRM, pesquisa, pipeline, conversas e abordagens       │
@@ -37,12 +37,12 @@ O sistema foi desenvolvido para funcionar inicialmente em ambiente local e pilot
 │ Usuários, empresas, contatos, campanhas, evidências,         │
 │ oportunidades, tarefas, conversas, auditoria e analytics     │
 └──────────────────────────────────────────────────────────────┘
+```
 
 Integrações opcionais:
 - API Anthropic para geração de textos comerciais
 - API OpenAI para análise de conversas
 - Wikidata para pesquisa pública controlada
-\`\`\`
 
 ## Funcionalidades principais
 
@@ -119,29 +119,29 @@ Pré-requisitos:
 
 No PowerShell:
 
-\`\`\`powershell
+```powershell
 npm ci
 Copy-Item .env.example .env
-\`\`\`
+```
 
 Edite o arquivo \`.env\` e defina uma senha para \`SEED_PASSWORD\`. Depois execute:
 
-\`\`\`powershell
+```powershell
 docker compose up -d --wait
 npm run db:migrate
 npm run db:seed
 npm run dev
-\`\`\`
+```
 
 Abra \`http://127.0.0.1:3000\`.
 
 As contas de demonstração são:
 
-\`\`\`text
+```text
 owner@demo.invalid
 operator@demo.invalid
 viewer@demo.invalid
-\`\`\`
+```
 
 A senha é a definida na variável \`SEED_PASSWORD\`. O banco PostgreSQL local utiliza a porta \`5440\`.
 
@@ -151,62 +151,62 @@ As integrações de IA ficam desativadas por padrão.
 
 Para geração de mensagens, configure:
 
-\`\`\`text
+```text
 ANTHROPIC_API_KEY
 CLAUDE_WRITING_MODEL
 OPENAI_API_KEY
 OPENAI_WRITING_MODEL
-\`\`\`
+```
 
 Para análise de conversas:
 
-\`\`\`text
+```text
 OPENAI_API_KEY
 OPENAI_MODEL
-\`\`\`
+```
 
 A aplicação exige configuração válida, autorização explícita e revisão humana antes de considerar qualquer resultado de IA como aprovado.
 
 ## Verificação
 
-\`\`\`powershell
+```powershell
 npm run typecheck
 npm test
 npm run build
-\`\`\`
+```
 
 Testes específicos:
 
-\`\`\`powershell
+```powershell
 npm run test:research
 npm run test:outreach
 npm run test:conversations
 npm run test:writing
 npm run test:crm
 npm run test:analytics
-\`\`\`
+```
 
 Os testes de navegador exigem o Microsoft Edge instalado:
 
-\`\`\`powershell
+```powershell
 npm run test:browser
 npm run test:conversation-browser
 npm run test:crm-browser
-\`\`\`
+```
 
 ## Banco de dados
 
 Para gerar uma nova migração:
 
-\`\`\`powershell
+```powershell
 npm run db:generate
-\`\`\`
+```
 
 Para aplicar as migrações:
 
-\`\`\`powershell
+```powershell
 npm run db:migrate
-\`\`\`
+```
 
 As migrações ficam versionadas na pasta \`drizzle/\`. Não utilize atualização automática do schema em produção sem revisar a migração gerada.
 
@@ -236,4 +236,3 @@ A próxima etapa principal é preparar a infraestrutura de produção e, posteri
 - [Capacidades do produto](docs/CAPACIDADES_PHISHSHIELD.md)
 - [Redação com IA](docs/REDACAO_IA.md)
 - [Validação do blueprint](docs/VALIDACAO_BLUEPRINT.md)
-
