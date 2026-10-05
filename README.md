@@ -21,22 +21,14 @@ O sistema foi desenvolvido para funcionar inicialmente em ambiente local e pilot
 
 ## Arquitetura
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Usuário                                                       │
-│ Login, CRM, pesquisa, pipeline, conversas e abordagens       │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ HTTPS
-┌──────────────────────────────▼───────────────────────────────┐
-│ Next.js 16 + React + TypeScript                              │
-│ Interface, autenticação, rotas da aplicação e API            │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ Drizzle ORM
-┌──────────────────────────────▼───────────────────────────────┐
-│ PostgreSQL 17                                                │
-│ Usuários, empresas, contatos, campanhas, evidências,         │
-│ oportunidades, tarefas, conversas, auditoria e analytics     │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    U[Usuário<br/>Login, CRM, pesquisa, pipeline,<br/>conversas e abordagens]
+    A[Next.js 16 + React + TypeScript<br/>Interface, autenticação, rotas e API]
+    D[(PostgreSQL 17<br/>Usuários, empresas, contatos,<br/>campanhas, evidências, oportunidades,<br/>tarefas, conversas, auditoria e analytics)]
+
+    U -->|HTTPS| A
+    A -->|Drizzle ORM| D
 ```
 
 Integrações opcionais:
